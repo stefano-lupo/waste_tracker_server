@@ -1,4 +1,4 @@
-import os
+import os, sys
 from bson import json_util, objectid
 from flask import Flask, request, json, abort, make_response
 from werkzeug import secure_filename
@@ -11,7 +11,7 @@ DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 IMAGE_DIR = DIR_PATH + "/tmp_images"
 GRID_FS_IMAGE_NAMESPACE = "images"
 
-LOCAL_IP = "192.168.1.10"
+LOCAL_IP = "localhost"
 PORT = 5000
 
 app = Flask(__name__)
@@ -117,6 +117,13 @@ def get_all_captures_by_dish():
    return toJson(dictionary)
 
 if __name__ == '__main__':
+   if (len(sys.argv) > 1):
+      LOCAL_IP = sys.argv[1]
+   
+
+   if (len(sys.argv) > 2):
+      PORT = sys.argv[2]
+   
    app.run(host=LOCAL_IP, port=PORT)
 
 
