@@ -4,6 +4,7 @@ from flask import Flask, request, json, abort, make_response
 from werkzeug import secure_filename
 from flask_pymongo import PyMongo
 from gridfs import GridFS
+from flask_cors import CORS
 import datetime
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -14,6 +15,7 @@ LOCAL_IP = "192.168.1.10"
 PORT = 5000
 
 app = Flask(__name__)
+CORS(app)
 app.debug = True
 app.config["MONGO_URI"] = "mongodb://localhost:27017/waste_tracker"
 mongo = PyMongo(app)
@@ -22,6 +24,10 @@ gridfs = GridFS(db, GRID_FS_IMAGE_NAMESPACE)
 
 def toJson(data):
    return json_util.dumps(data)
+
+@app.route('/')
+def root():
+   return "hello world!"
 
 # Specify an RFID -> Dish link
 @app.route('/rfidtodish', methods = ['POST'])
@@ -46,12 +52,13 @@ def upload_collection_data():
    # Fetch the link entry created when RFID was registered to a meal
    data = json.loads(request.form.getlist('json')[0])
    rfid = data["rfid"]
-   link_entries = link_entry = db.captures.find({"rfid": rfid, "file_id": None}).sort("registed_timestamp", 1)
+   link_entry = db.captures.find_one({"rfid": rfid, "file_id": None})
 
-   if (link_entries is None):
+   if (link_entry is None):
+      print("No link entry for: " + rfid)
       abort(404, "Unable to find link entry for " + rfid)
+      return
 
-   link_entry = link_entries[0]
    print("Found link entry: ", link_entry)
 
    # Save file in GFS
@@ -85,11 +92,29 @@ def get_captures_for_dishname(name):
 @app.route('/image/<id>', methods = ['GET'])
 def get_image_by_id(id):
    print(id)
-   f = gridfs.get(id)
+   f = gridfs.get(objectid.ObjectId(id))
    response = make_response(f.read())
    response.mimetype = 'image/jpeg'
    return response
 
+@app.route('/captures-by-dish')
+def get_all_captures_by_dish():
+   dictionary = {}
+   captures = db.captures.find({})
+   for capture in captures:
+      dish_name = capture['dish_name']
+      if ('file_id' not in capture):
+         print("Skipping " + capture['dish_name'] + " as no file_id")
+         continue
+      
+      capture['image_url'] = "http://" + LOCAL_IP  + ":" + str(PORT) + "/image/" + str(capture['file_id'])
+      if dish_name in dictionary:
+         dictionary[dish_name].append(capture)
+      else:
+         dictionary[dish_name] = [capture]
+
+    
+   return toJson(dictionary)
 
 if __name__ == '__main__':
    app.run(host=LOCAL_IP, port=PORT)
