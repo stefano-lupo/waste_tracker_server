@@ -1,6 +1,6 @@
 import os
 from bson import json_util, objectid
-from flask import Flask, request, json, abort
+from flask import Flask, request, json, abort, make_response
 from werkzeug import secure_filename
 from flask_pymongo import PyMongo
 from gridfs import GridFS
@@ -69,7 +69,7 @@ def upload_collection_data():
    return "File uploaded succesfully"
 
 @app.route('/dish')
-def get_images_for_dish():
+def get_dishes_for_rfid():
    dish_name = request.args.get('dish_name')
    captures = db.captures.find({'dish_name': dish_name})
 
@@ -77,6 +77,19 @@ def get_images_for_dish():
       abort(404, "No dish found with name " + dish_name)
 
    return toJson(captures)
+
+@app.route('/dish/<name>', methods = ['GET'])
+def get_captures_for_dishname(name):
+   return toJson(db.captures.find({'dish_name': name}))
+
+@app.route('/image/<id>', methods = ['GET'])
+def get_image_by_id(id):
+   print(id)
+   f = gridfs.get(id)
+   response = make_response(f.read())
+   response.mimetype = 'image/jpeg'
+   return response
+
 
 if __name__ == '__main__':
    app.run(host=LOCAL_IP, port=PORT)
